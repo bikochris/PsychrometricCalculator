@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Psychrometric Calculator by Bikorimana Christian</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            max-width: 800px; /* Adjust the maximum width as per your preference */
+            margin: auto; /* Center align the table */
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 5px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .bold {
+            font-weight: bold;
+        }
+        input[type="number"] {
+            width: 50px;
+            text-align: center;
+        }
+        h3{
+            color: blueviolet;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-statistics/7.7.0/simple-statistics.min.js"></script>
+</head>
+<body>
+    <h2>Psychrometric Calculator</h2>
+    <h3>Bikorimana Christian-Based on ASHRAE Fundamentals (SI) 2017 chapter 1. Page last updated :09/06/2024</h3>
+    <h4>Enter Temperature and Relative Humidity </h4>
+    <table>
+        <thead>
+            <tr>
+                <th>Hours</th>
+                <th>Thermo</th>
+                <th>Tsec</th>
+                <th>S.Pressure</th> <!-- New column -->
+                <th>Hygro</th>
+                <th>RH</th>
+                <th>V.Pressure</th> <!-- Modified column for r -->
+                <th>Twet</th> <!-- Additional column for RH * r -->
+                <th>Tdew</th> <!-- Renamed column for Td -->
+                <th>Diff</th> <!-- Renamed column for Diff -->
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+            <!-- Rows will be dynamically generated here -->
+        </tbody>
+    </table>
+    <br>
+    <button onclick="calculateRegression()">Calculate</button>
+    <script>
+        // Generate table rows for hours
+        const tableBody = document.getElementById('tableBody');
+        for (let i = 0; i < 24; i++) {
+            const row = document.createElement('tr');
+            const hourCell = document.createElement('td');
+            const thermoCell = document.createElement('td');
+            const tsecCell = document.createElement('td');
+            const tsecKelvinCell = document.createElement('td'); // New cell for Tsec(K)
+            const hygroCell = document.createElement('td');
+            const rhCell = document.createElement('td');
+            const rCell = document.createElement('td'); // New cell for r
+            const rhTimesRCell = document.createElement('td'); // New cell for RH * r
+            const tdCell = document.createElement('td'); // Renamed cell for Td
+            const diffCell = document.createElement('td'); // Renamed cell for Diff
+
+            hourCell.textContent = `${String(i).padStart(2, '0')}:00`;
+            thermoCell.innerHTML = `<input type="number" id="thermo-${i}">`;
+            tsecCell.innerHTML = (i >= 6 && i <= 18) ? `<input type="number" id="tsec-${i}">` : `<span id="tsec-${i}"></span>`;
+            tsecKelvinCell.id = `tsecKelvin-${i}`; // Set id for Tsec(K) cell
+            hygroCell.innerHTML = `<input type="number" id="hygro-${i}">`;
+            rhCell.innerHTML = (i >= 6 && i <= 18) ? `<input type="number" id="rh-${i}">` : `<span id="rh-${i}"></span>`;
+            rCell.id = `r-${i}`; // Set id for r cell
+            rhTimesRCell.id = `rhTimesR-${i}`; // Set id for RH * r cell
+            tdCell.id = `td-${i}`; // Set id for Td cell
+            diffCell.id = `diff-${i}`; // Set id for Diff cell
+
+            row.appendChild(hourCell);
+            row.appendChild(thermoCell);
+            row.appendChild(tsecCell);
+            row.appendChild(tsecKelvinCell); // Append the Tsec(K) cell
+            row.appendChild(hygroCell);
+            row.appendChild(rhCell);
+            row.appendChild(rCell); // Append the r cell
+            row.appendChild(rhTimesRCell); // Append the RH * r cell
+            row.appendChild(tdCell); // Append the Td cell
+            row.appendChild(diffCell); // Append the Diff cell
+            tableBody.appendChild(row);
+        }
+
+        // Function to calculate Tsec(K) = Tsec + 273.15
+        function calculateTsecKelvin(tsec) {
+            const a = tsec + 273.15;
+            return Math.exp(
+                (-5800.2206 / a) + 1.3914993 - (a * (48.640239 * Math.pow(10, -3))) + (Math.pow(a, 2) * (0.000041764768)) +
+                (Math.pow(a, 3) * (-14.452093 * Math.pow(10, -9))) + (6.5459673 * Math.log(a)));
+        }
+
+        // Function to calculate r = (Tsec(K) * RH) / 100
+        function calculateR(tsecKelvin, rh) {
+            return (tsecKelvin * rh) / 100;
+        }
+
+        // Function to calculate RhTimesR = Twet
+        function calculateRhTimesR(tsec, rh) {
+            const term1 = tsec * Math.atan(0.151977 * Math.sqrt(rh + 8.313659));
+            const term2 = Math.atan(tsec + rh);
+            const term3 = Math.atan(rh - 1.676331);
+            const term4 = 0.00391838 * Math.pow(rh, 1.5) * Math.atan(0.023101 * rh);
+            const result = term1 + term2 - term3 + term4 - 4.686035;
+            return result;
+        }
+
+        // Function to calculate Td = 6.54 + (14.526 * Math.log(RhTimesR / 1000)) + (0.7389 * Math.pow(Math.log(RhTimesR / 1000), 2)) + (0.09486 * Math.pow(Math.log(RhTimesR / 1000), 3)) + (0.4569 * Math.pow(RhTimesR / 1000, 0.1984));
+        function calculateTd(r) {
+    const lnRhTimesR = Math.log(r/ 1000);
+    return 6.54 + (14.526 * lnRhTimesR) + (0.7389 * Math.pow(lnRhTimesR, 2)) + (0.09486 * Math.pow(lnRhTimesR, 3)) + (0.4569 * Math.pow(r/ 1000, 0.1984));
+        }
+        // Function to calculate Diff = RhTimesR - Td
+        function calculateDiff(rhTimesR, tsec) {
+            return tsec - rhTimesR;
+        }
+
+        function calculateRegression() {
+            const thermoValues = [];
+            const tsecValues = [];
+            const hygroValues = [];
+            const rhValues = [];
+            const hours = [];
+
+            // Collect data points for regression from 06:00 to 18:00
+            for (let i = 6; i <= 18; i++) {
+                const thermo = document.getElementById(`thermo-${i}`).value;
+                const tsec = document.getElementById(`tsec-${i}`).value;
+                const hygro = document.getElementById(`hygro-${i}`).value;
+                const rh = document.getElementById(`rh-${i}`).value;
+
+                if (thermo && tsec && hygro && rh) {
+                    thermoValues.push(Number(thermo));
+                    tsecValues.push(Number(tsec));
+                    hygroValues.push(Number(hygro));
+                    rhValues.push(Number(rh));
+                    hours.push(i);
+                }
+            }
+
+            // Calculate regression line for Thermo and Tsec
+            const thermoTsecData = hours.map((hour, index) => [thermoValues[index], tsecValues[index]]);
+            const thermoTsecRegression = ss.linearRegression(thermoTsecData);
+            const thermoTsecRegressionFunction = ss.linearRegressionLine(thermoTsecRegression);
+
+            // Calculate regression line for Hygro and RH
+            const hygroRhData = hours.map((hour, index) => [hygroValues[index], rhValues[index]]);
+            const hygroRhRegression = ss.linearRegression(hygroRhData);
+            const hygroRhRegressionFunction = ss.linearRegressionLine(hygroRhRegression);
+
+            // Calculate missing Tsec and RH values and update the table
+            for (let i = 0; i < 6; i++) {
+                const thermo = document.getElementById(`thermo-${i}`).value;
+                const hygro = document.getElementById(`hygro-${i}`).value;
+                if (thermo) {
+                    const tsec = thermoTsecRegressionFunction(Number(thermo));
+                    const tsecCell = document.getElementById(`tsec-${i}`);
+                    const tsecKelvin = calculateTsecKelvin(tsec); // Calculate Tsec(K)
+                    tsecCell.classList.add('bold');
+                    tsecCell.textContent = tsec.toFixed(2);
+
+                    const tsecKelvinCell = document.getElementById(`tsecKelvin-${i}`);
+                    tsecKelvinCell.classList.add('bold');
+                    tsecKelvinCell.textContent = tsecKelvin.toFixed(2);
+
+                    if (hygro) {
+                        const rh = hygroRhRegressionFunction(Number(hygro));
+                        const rhCell = document.getElementById(`rh-${i}`);
+                        const rCell = document.getElementById(`r-${i}`); // Get the r cell
+                        const rhTimesRCell = document.getElementById(`rhTimesR-${i}`); // Get the RH * r cell
+                        const tdCell = document.getElementById(`td-${i}`); // Get the Td cell
+                        const diffCell = document.getElementById(`diff-${i}`); // Get the Diff cell
+                        rhCell.classList.add('bold');
+                        rhCell.textContent = rh.toFixed(2);
+                        const r = calculateR(tsecKelvin, rh); // Calculate r
+                        rCell.classList.add('bold');
+                        rCell.textContent = r.toFixed(2); // Display r
+                        const rhTimesR = calculateRhTimesR(tsec, rh); // Calculate RH * r
+                        rhTimesRCell.classList.add('bold');
+                        rhTimesRCell.textContent = rhTimesR.toFixed(2); // Display RH * r
+                        const td = calculateTd(r); // Calculate Td
+                        tdCell.classList.add('bold');
+                        tdCell.textContent = td.toFixed(2); // Display Td
+                        const diff = calculateDiff(rhTimesR, tsec); // Calculate Diff
+                        diffCell.classList.add('bold');
+                        diffCell.textContent = diff.toFixed(2); // Display Diff
+                    }
+                }
+            }
+
+            // For hours from 19 to 23
+            for (let i = 19; i < 24; i++) {
+                const thermo = document.getElementById(`thermo-${i}`).value;
+                const hygro = document.getElementById(`hygro-${i}`).value;
+                if (thermo) {
+                    const tsec = thermoTsecRegressionFunction(Number(thermo));
+                    const tsecCell = document.getElementById(`tsec-${i}`);
+                    const tsecKelvin = calculateTsecKelvin(tsec); // Calculate Tsec(K)
+                    tsecCell.classList.add('bold');
+                    tsecCell.textContent = tsec.toFixed(2);
+
+                    const tsecKelvinCell = document.getElementById(`tsecKelvin-${i}`);
+                    tsecKelvinCell.classList.add('bold');
+                    tsecKelvinCell.textContent = tsecKelvin.toFixed(2);
+
+                    if (hygro) {
+                        const rh = hygroRhRegressionFunction(Number(hygro));
+                        const rhCell = document.getElementById(`rh-${i}`);
+                        const rCell = document.getElementById(`r-${i}`); // Get the r cell
+                        const rhTimesRCell = document.getElementById(`rhTimesR-${i}`); // Get the RH * r cell
+                        const tdCell = document.getElementById(`td-${i}`); // Get the Td cell
+                        const diffCell = document.getElementById(`diff-${i}`); // Get the Diff cell
+                        rhCell.classList.add('bold');
+                        rhCell.textContent = rh.toFixed(2);
+                        const r = calculateR(tsecKelvin, rh); // Calculate r
+                        rCell.classList.add('bold');
+                        rCell.textContent = r.toFixed(2); // Display r
+                        const rhTimesR = calculateRhTimesR(tsec, rh); // Calculate RH * r
+                        rhTimesRCell.classList.add('bold');
+                        rhTimesRCell.textContent = rhTimesR.toFixed(2); // Display RH * r
+                        const td = calculateTd(r); // Calculate Td
+                        tdCell.classList.add('bold');
+                        tdCell.textContent = td.toFixed(2); // Display Td
+                        const diff = calculateDiff(rhTimesR, tsec); // Calculate Diff
+                        diffCell.classList.add('bold');
+                        diffCell.textContent = diff.toFixed(2); // Display Diff
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
